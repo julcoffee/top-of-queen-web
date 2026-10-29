@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#171521">
+<title>Top of Queen · 히비키</title>
+<meta name="description" content="히비키와 대화하고 방송과 연습을 함께하는 Unity 체험판">
+<style>
+  /* 시작 화면은 다른 PC 체험판(2026-10-29)과 같은 구성: 홈 화면 그림 위에 제목 · 만나러 가기 버튼 · 안내. 누르면 그때 게임을 받는다. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+  body { color: #fff; font-family: system-ui, -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+         display: flex; align-items: center; justify-content: center;
+         background: radial-gradient(ellipse at 30% 20%, #3e294c, transparent 65%), #111019; }
+  #game { position: relative; overflow: hidden; border-radius: 18px; background: #12111b; box-shadow: 0 20px 100px #0008; }
+  #unity-canvas { width: 100%; height: 100%; display: block; outline: none; background: #12111b; }
+  #loading { position: absolute; inset: 0; overflow: hidden; }
+  #loading > img { width: 100%; height: 100%; object-fit: cover; filter: blur(1px); opacity: .66; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(0deg, #171321 8%, #171321f5 24%, #17132110 78%); }
+  .intro { position: absolute; left: 8%; right: 8%; bottom: 5%; }
+  .eyebrow { font-size: 10px; letter-spacing: .25em; color: #e9bfd7; }
+  h1 { font-size: clamp(35px, 6vh, 57px); line-height: .94; letter-spacing: -.05em; font-weight: 300; margin: 14px 0 18px; }
+  h1 strong { font-weight: 850; }
+  p { font-size: 14px; color: #ddd1e6; margin: 0; }
+  #play { cursor: pointer; border: 0; color: #fff; background: #ed569a; border-radius: 16px; font-size: 16px; font-weight: 700;
+          padding: 18px 22px; width: 100%; margin: 15px 0 0; box-shadow: 0 8px 25px #ed569a38; font-family: inherit; text-align: left; }
+  #play span { float: right; }
+  #play:hover { background: #fb67aa; }
+  #play:disabled { opacity: .6; cursor: wait; }
+  #progress { height: 4px; background: #ffffff20; border-radius: 4px; margin-top: 18px; overflow: hidden; }
+  #bar { height: 100%; width: 0; background: #f8a0cf; transition: width .2s; }
+  #status { font-size: 12px; margin: 12px 0; }
+  small { display: block; color: #b4a4c1; font-size: 10px; line-height: 1.8; margin: 14px 0 0; }
+  #error { position: absolute; inset: 0; background: #171321eb; padding: 45% 9% 10%; }
+  #error p { line-height: 1.8; }
+  #error button { cursor: pointer; border: 0; color: #fff; background: #ed569a; border-radius: 14px; font-size: 15px; font-weight: 700;
+                  padding: 14px 20px; width: 100%; margin-top: 16px; font-family: inherit; }
+  footer { position: fixed; bottom: 3px; font-size: 10px; color: #9d91a6; letter-spacing: .02em; }
+  footer span { padding: 0 5px; }
+  @media (max-width: 600px) { #game { border-radius: 0; box-shadow: none; } footer { display: none; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main id="game">
+  <canvas id="unity-canvas" tabindex="-1" aria-label="Top of Queen 게임"></canvas>
+  <section id="loading">
+    <img src="preview.png" alt="홈에서 기다리는 히비키">
+    <div class="shade"></div>
+    <div class="intro">
+      <span class="eyebrow">A NEW DAY WITH HIBIKI</span>
+      <h1>TOP OF<br><strong>QUEEN</strong></h1>
+      <p>오늘의 이야기부터, 다음 무대까지.</p>
+      <button id="play">히비키 만나러 가기 <span>→</span></button>
+      <div id="progress" hidden><div id="bar"></div></div>
+      <p id="status" role="status">설치 없이 바로 플레이</p>
+      <small>대화·방송·육성을 체험하는 프로토타입<br><span id="ai-note">1:1 대화의 자유 입력에는 준비된 대사로 답해요.</span><br>진행과 대화 기록은 이 브라우저에 저장됩니다. 글을 쓸 때는 브라우저 입력창이 열려요.</small>
+    </div>
+  </section>
+  <div id="error" hidden><p id="error-text"></p><button onclick="location.reload()">다시 열기</button></div>
+</main>
+<footer>TOP OF QUEEN <span>·</span> 히비키와 함께하는 체험판</footer>
+<script>
+  // 게임 화면은 세로 540×960 기준 — 창 크기에 맞춰 9:16으로 꽉 차게 (남는 쪽은 어두운 바탕). 넓은 화면은 위아래 3% 여백.
+  var game = document.querySelector("#game");
+  var canvas = document.querySelector("#unity-canvas");
+  function fit() {
+    var w = window.innerWidth, h = window.innerHeight * (window.innerWidth > 600 ? .94 : 1);
+    var gw = Math.min(w, h * 9 / 16), gh = gw * 16 / 9;
+    game.style.width = Math.floor(gw) + "px";
+    game.style.height = Math.floor(gh) + "px";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  // AI 대화 서버(/api/chat)가 같은 사이트에 있을 때만 AI 안내를 보여 준다 (GitHub Pages처럼 없으면 404 → 준비된 대사 안내 그대로)
+  fetch("/api/chat", { method: "GET", cache: "no-store" }).then(function (r) {
+    if (r.status !== 404) document.querySelector("#ai-note").textContent = "AI 대화 입력은 답변 생성을 위해 fal로 전송됩니다.";
+  }).catch(function () {});
+
+  function progress(text, amount) {
+    document.querySelector("#status").textContent = text;
+    document.querySelector("#bar").style.width = Math.round(Math.min(1, amount) * 100) + "%";
+  }
+  function showError(message) {
+    document.querySelector("#error-text").textContent = "문제가 생겼어요: " + message;
+    document.querySelector("#error").hidden = false;
+  }
+  function unityShowBanner(message, type) { if (type === "error") showError(message); else console.warn(message); }
+
+  var buildUrl = "Build";
+  var loaderUrl = buildUrl + "/out.loader.js";
+  var config = {
+    dataUrl: buildUrl + "/out.data.unityweb",
+    frameworkUrl: buildUrl + "/out.framework.js.unityweb",
+    codeUrl: buildUrl + "/out.wasm.unityweb",
+    streamingAssetsUrl: "StreamingAssets",
+    companyName: "TopOfQueen",
+    productName: "Top of Queen",
+    productVersion: "0.1.0",
+    showBanner: unityShowBanner,
+    devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+  };
+
+  // 버튼을 누르면 그때 게임을 받는다 (누르기 전에는 그림 한 장만)
+  var play = document.querySelector("#play");
+  play.onclick = function () {
+    play.disabled = true;
+    play.firstChild.textContent = "히비키를 만나러 가는 중… ";
+    document.querySelector("#progress").hidden = false;
+    progress("게임 받는 중 0%", 0);
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (p) {
+        progress((p < .9 ? "게임 받는 중 " : "히비키의 하루를 준비하는 중 ") + Math.round(p * 100) + "%", p);
+      }).then(function () {
+        document.querySelector("#loading").remove();
+        canvas.focus();
+      }).catch(function (message) { showError(message); });
+    };
+    script.onerror = function () { showError("게임 파일을 받지 못했어요. 새로고침해 주세요."); };
+    document.body.appendChild(script);
+  };
+</script>
+</body>
+</html>
