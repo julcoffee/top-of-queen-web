@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Top of Queen",
+  "short_name": "Top of Queen",
+  "description": "이솔과 함께 방송하고 연습하는 체험판 · 설치 없이 바로 플레이",
+  "lang": "ko",
+  "start_url": "./?from=home",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#171321",
+  "theme_color": "#171321",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
